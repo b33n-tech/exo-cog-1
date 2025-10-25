@@ -10,7 +10,17 @@ const uploadJson = document.getElementById("uploadJson");
 // --- Tâches stockées localement ---
 let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
 
-// --- Affichage sidebar avec clic + survol ---
+// --- Fonction pour formater la date en "JJ/MM hh:mm" ---
+function formatDate(iso){
+  const d = new Date(iso);
+  const day = String(d.getDate()).padStart(2,'0');
+  const month = String(d.getMonth()+1).padStart(2,'0');
+  const hours = String(d.getHours()).padStart(2,'0');
+  const minutes = String(d.getMinutes()).padStart(2,'0');
+  return `${day}/${month} ${hours}:${minutes}`;
+}
+
+// --- Affichage sidebar avec clic + survol + horodatage ---
 function renderTasks() {
   tasksContainer.innerHTML = "";
   tasks
@@ -20,29 +30,30 @@ function renderTasks() {
       const li = document.createElement("li");
       li.className = "task-item";
 
-      // Texte tâche
       const taskText = document.createElement("div");
       taskText.className = "task-text";
       taskText.textContent = task.text + " (ajoutée le " + task.date.split("T")[0] + ")";
       taskText.style.cursor = "pointer";
 
-      // Tooltip pour survol des commentaires
+      // Tooltip pour survol des commentaires avec timestamps
       if(task.comments?.length){
-        taskText.title = task.comments.map(c=>"• "+c).join("\n");
+        taskText.title = task.comments.map(c=>{
+          return `• ${c.text} (${formatDate(c.date)})`;
+        }).join("\n");
       }
 
-      // Bloc commentaire caché initialement
+      // Bloc commentaire caché
       const commentBlock = document.createElement("div");
       commentBlock.className = "comment-section";
       commentBlock.style.display = "none";
 
-      // Liste commentaires
+      // Liste des commentaires
       const commentList = document.createElement("ul");
       commentList.className = "comment-list";
       if(task.comments?.length){
         task.comments.forEach(c=>{
           const cLi = document.createElement("li");
-          cLi.textContent = c;
+          cLi.textContent = `[${formatDate(c.date)}] ${c.text}`;
           commentList.appendChild(cLi);
         });
       }
@@ -60,7 +71,7 @@ function renderTasks() {
         const val = commentInput.value.trim();
         if(val!==""){
           if(!task.comments) task.comments=[];
-          task.comments.push(val);
+          task.comments.push({text: val, date: new Date().toISOString()});
           localStorage.setItem("tasks", JSON.stringify(tasks));
           commentInput.value="";
           renderTasks();
@@ -122,7 +133,7 @@ prompts.forEach(p=>{
     const combined = p.text + "\n\n" + tasks.map(t=>{
       let str = "- "+t.text;
       if(t.comments?.length){
-        str += "\n  Commentaires :\n" + t.comments.map(c=>"    - "+c).join("\n");
+        str += "\n  Commentaires :\n" + t.comments.map(c=>`    - [${formatDate(c.date)}] ${c.text}`).join("\n");
       }
       return str;
     }).join("\n");
@@ -147,6 +158,11 @@ uploadJson.addEventListener("change", event=>{
           data.forEach(item=>{
             if(item.text && item.date){
               if(!item.comments) item.comments=[];
+              // s'assurer que chaque commentaire a une date
+              item.comments = item.comments.map(c=>{
+                if(typeof c==='string') return {text:c, date:new Date().toISOString()};
+                return c;
+              });
               tasks.push({text:item.text, date:item.date, comments:item.comments});
             }
           });
